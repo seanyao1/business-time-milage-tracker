@@ -102,6 +102,22 @@ def configure_log_sheet(
 
 
 def add_validations(time_ws, mileage_ws, lists_ws) -> None:
+    for ws in (time_ws, mileage_ws):
+        property_validation = DataValidation(
+            type="list",
+            formula1="'Lists'!$B$2:$B$11",
+            allow_blank=False,
+        )
+        property_validation.promptTitle = "Choose a property"
+        property_validation.prompt = "Select a property or add one on the Lists sheet."
+        property_validation.errorTitle = "Select a listed property"
+        property_validation.error = "Choose a property from the dropdown."
+        property_validation.errorStyle = "stop"
+        property_validation.showErrorMessage = True
+        property_validation.showInputMessage = True
+        ws.add_data_validation(property_validation)
+        property_validation.add("B2:B1001")
+
     activity_validation = DataValidation(
         type="list",
         formula1="'Lists'!$A$2:$A$11",
@@ -237,11 +253,12 @@ def build_instructions(ws) -> None:
     ws["B18"].fill = PatternFill("solid", fgColor=CREAM)
     ws["B18"].border = Border(left=THIN_GRAY, right=THIN_GRAY, top=THIN_GRAY, bottom=THIN_GRAY)
 
-    add_section_heading(ws, 22, "Customize activity choices", 4)
+    add_section_heading(ws, 22, "Customize dropdown choices", 4)
     ws.merge_cells("B23:C24")
     ws["B23"] = (
-        "Unhide the Lists sheet (Home > Format > Hide & Unhide > Unhide Sheet), edit the activity names, "
-        "then hide it again. Keep the choices within cells A2:A11 so the dropdown continues to work."
+        "Unhide the Lists sheet (Home > Format > Hide & Unhide > Unhide Sheet), edit activities in "
+        "A2:A11 and properties in B2:B11, then hide it again. Keep choices within those ranges so the "
+        "dropdowns continue to work."
     )
     ws["B23"].alignment = Alignment(vertical="top", wrap_text=True)
     ws["B23"].font = Font(name="Aptos", color=DARK)
@@ -445,6 +462,7 @@ def build_mileage_log(ws, year: int) -> None:
 
 def build_lists(ws) -> None:
     ws["A1"] = "Activity"
+    ws["B1"] = "Property"
     activities = [
         "Administration",
         "Bookkeeping",
@@ -459,7 +477,22 @@ def build_lists(ws) -> None:
     ]
     for row, activity in enumerate(activities, start=2):
         ws.cell(row, 1, activity)
+    properties = [
+        "Maple Street Duplex",
+        "Oak Avenue Rental",
+        "Property 3",
+        "Property 4",
+        "Property 5",
+        "Property 6",
+        "Property 7",
+        "Property 8",
+        "Property 9",
+        "Property 10",
+    ]
+    for row, property_name in enumerate(properties, start=2):
+        ws.cell(row, 2, property_name)
     ws.column_dimensions["A"].width = 28
+    ws.column_dimensions["B"].width = 28
 
 
 def build_workbook(output_path: Path = OUTPUT_PATH) -> None:
@@ -501,9 +534,21 @@ def validate_workbook(output_path: Path = OUTPUT_PATH) -> None:
     assert wb["Mileage Log"].tables["MileageLog"].ref == "A1:G4"
     assert wb["Time Log"].freeze_panes == "A2"
     assert wb["Mileage Log"].freeze_panes == "A2"
-    assert len(wb["Time Log"].data_validations.dataValidation) == 3
-    assert len(wb["Mileage Log"].data_validations.dataValidation) == 2
+    assert len(wb["Time Log"].data_validations.dataValidation) == 4
+    assert len(wb["Mileage Log"].data_validations.dataValidation) == 3
     assert len(wb["Summary"].data_validations.dataValidation) == 1
+    time_validations = wb["Time Log"].data_validations.dataValidation
+    mileage_validations = wb["Mileage Log"].data_validations.dataValidation
+    assert any(
+        validation.formula1 == "'Lists'!$B$2:$B$11"
+        and str(validation.sqref) == "B2:B1001"
+        for validation in time_validations
+    )
+    assert any(
+        validation.formula1 == "'Lists'!$B$2:$B$11"
+        and str(validation.sqref) == "B2:B1001"
+        for validation in mileage_validations
+    )
     assert len(wb["Summary"]._charts) == 2
     assert str(wb["Summary"]["B6"].value).startswith("=SUMIFS(TimeLog[Hours]")
     assert str(wb["Summary"]["D6"].value).startswith("=SUMIFS(MileageLog[Miles]")
